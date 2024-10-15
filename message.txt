@@ -1,0 +1,139 @@
+using System;
+using System.Net.Sockets;
+using System.Text;
+using System.Windows.Forms;
+
+namespace ClientApp
+{
+    public partial class MainForm : Form
+    {
+        private TcpClient clientSocket;
+        private NetworkStream serverStream;
+
+        public MainForm()
+        {
+            InitializeComponent();
+            clientSocket = new TcpClient();
+            // Intentamos conectar al servidor en la dirección IP y puerto
+            clientSocket.Connect("127.0.0.1", 9050); // Cambiar la IP si el servidor está en otra máquina
+            serverStream = clientSocket.GetStream();
+
+            // Inicialmente ocultamos los campos de contraseña
+            lblPassword.Visible = false;
+            txtPassword.Visible = false;
+            btnLogin.Visible = false; // Botón de iniciar sesión oculto al inicio
+            btnRegister.Visible = false; // Botón de registro oculto al inicio
+        }
+
+        // Función para enviar datos al servidor
+        private void SendRequest(string request)
+        {
+            byte[] outStream = Encoding.ASCII.GetBytes(request);
+            serverStream.Write(outStream, 0, outStream.Length);
+            serverStream.Flush();
+        }
+
+        // Función para recibir la respuesta del servidor
+        private string ReceiveResponse()
+        {
+            byte[] inStream = new byte[512];
+            int bytesRead = serverStream.Read(inStream, 0, inStream.Length);
+            return Encoding.ASCII.GetString(inStream, 0, bytesRead);
+        }
+
+        // Evento para el campo de texto de nombre de usuario (cuando se presiona Enter)
+        private void txtUsername_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                string username = txtUsername.Text;
+
+                // Enviar petición de consulta al servidor
+                string request = $"3/{username}";
+                SendRequest(request);
+
+                // Recibir respuesta del servidor
+                string serverResponse = ReceiveResponse();
+                
+                if (serverResponse.Contains("Usuario encontrado"))
+                {
+                    // Si el usuario está registrado, mostramos el campo de contraseña y el botón de iniciar sesión
+                    lblPassword.Visible = true;
+                    txtPassword.Visible = true;
+                    btnLogin.Visible = true; // Mostrar botón de Iniciar Sesión
+                    btnRegister.Visible = false; // Ocultar botón de Registro
+                    MessageBox.Show("Usuario encontrado. Por favor, ingrese su contraseña para iniciar sesión.");
+                }
+                else
+                {
+                    // Si el usuario no está registrado, habilitamos el registro
+                    MessageBox.Show("Usuario no encontrado. Puedes registrarte.");
+                    lblPassword.Visible = true; // Mostrar el campo de contraseña
+                    txtPassword.Visible = true; // Mostrar el campo de contraseña
+                    btnLogin.Visible = false; // Ocultar botón de Iniciar Sesión
+                    btnRegister.Visible = true; // Mostrar botón de Registro
+                }
+            }
+        }
+
+        // Evento para el botón de "Registro"
+        private void btnRegister_Click(object sender, EventArgs e)
+        {
+            string username = txtUsername.Text;
+            string password = txtPassword.Text;
+
+            // Enviar petición de registro al servidor
+            string request = $"1/{username}/{password}";
+            SendRequest(request);
+
+            // Recibir respuesta del servidor
+            string serverResponse = ReceiveResponse();
+
+            if (serverResponse.Contains("Registro exitoso"))
+            {
+                MessageBox.Show("Registro exitoso. Ahora puedes iniciar sesión.");
+                lblPassword.Visible = true; // Mostrar el campo de contraseña
+                txtPassword.Visible = true; // Mostrar el campo de contraseña
+                btnLogin.Visible = true; // Mostrar botón de Iniciar Sesión
+                btnRegister.Visible = false; // Ocultar botón de Registro
+            }
+            else
+            {
+                MessageBox.Show("Error en el registro.");
+            }
+        }
+
+        // Evento para finalizar el inicio de sesión después de ingresar la contraseña
+        private void btnLogin_Click(object sender, EventArgs e)
+        {
+            string username = txtUsername.Text;
+            string password = txtPassword.Text;
+
+            // Enviar petición de inicio de sesión al servidor
+            string request = $"2/{username}/{password}";
+            SendRequest(request);
+
+            // Recibir respuesta del servidor
+            string serverResponse = ReceiveResponse();
+
+            if (serverResponse.Contains("Inicio de sesión correcto"))
+            {
+                MessageBox.Show("Inicio de sesión exitoso.");
+            }
+            else
+            {
+                MessageBox.Show("Error en el inicio de sesión. Verifica tu nombre de usuario o contraseña.");
+            }
+        }
+
+        // Función para cerrar la conexión del cliente al salir de la aplicación
+        private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            if (clientSocket != null && clientSocket.Connected)
+            {
+                serverStream.Close();
+                clientSocket.Close();
+            }
+        }
+    }
+}
